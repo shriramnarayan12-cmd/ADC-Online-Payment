@@ -134,7 +134,11 @@ export default function App() {
       
       setLoading(true);
       try {
-        const currentMonthPrefix = new Date().toISOString().substring(0, 7); // e.g., "2026-06"
+        // BULLETPROOF DATE: Gets local timezone year and month perfectly (YYYY-MM)
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const currentMonthPrefix = `${year}-${month}`; 
         
         const q = query(collection(db, 'attendance'), where('batch_name', '==', formData.batch_name));
         const querySnapshot = await getDocs(q);
@@ -147,7 +151,13 @@ export default function App() {
           if (data.date && data.date.startsWith(currentMonthPrefix)) {
             const type = (data.sessionType || "Regular").trim();
             if (type === "Regular" || type === "Re-Scheduled") {
-              if (data.presentStudents && data.presentStudents.includes(formData.reg_no)) {
+              
+              // BULLETPROOF ID CHECK: Handles numbers, strings, and accidental spaces
+              const isPresent = data.presentStudents && data.presentStudents.some((id: any) => 
+                String(id).trim() === String(formData.reg_no).trim()
+              );
+              
+              if (isPresent) {
                 presentCount++;
               }
             }
@@ -165,7 +175,6 @@ export default function App() {
 
     fetchAttendance();
   }, [formData.batch_name, formData.reg_no]);
-
   // 4. Clean Fee Calculation
   const calculation = useMemo(() => {
     if (!selectedBatchObj || !selectedStudent) return { base: 0, total: 0, currency: 'INR', symbol: '₹' };
