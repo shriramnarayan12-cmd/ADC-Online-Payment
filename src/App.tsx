@@ -15,6 +15,7 @@ const ONLINE_BATCHES = [
   { name: "AOK WED 8:30PM Maanvi", fee: 1200, currency: "INR" },
   { name: "AOK WED 7:30PM Maanvi", fee: 500, currency: "INR" },
   { name: "AOK FRI 6AM Maanvi", fee: 50, currency: "USD" },
+  { name: "AOK  Parnika Batch", fee: 50, currency: "USD" },
   { name: "AOK FRI 8PM Maanvi", fee: 1500, currency: "INR" }
 ];
 
