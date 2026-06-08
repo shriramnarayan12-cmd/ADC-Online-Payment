@@ -1,0 +1,6 @@
+{
+  "name": "ADC Fees Portal",
+  "description": "A standalone React application for parents to submit fee payments.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
