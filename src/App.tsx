@@ -60,9 +60,12 @@ interface Student {
 interface FormData {
   batch_name: string;
   reg_no: string;
+  period: string;
   txn_id: string;
   usd_payment_method: 'Bank' | 'Zelle' | 'PayPal';
 }
+
+const QUARTERS = ['June/Jul/Aug', 'Sep/Oct/Nov', 'Dec/Jan/Feb', 'March'];
 
 export default function App() {
   const [students, setStudents] = useState<Student[]>([]);
@@ -71,6 +74,7 @@ export default function App() {
   const [formData, setFormData] = useState<FormData>({
     batch_name: '',
     reg_no: '',
+    period: '',
     txn_id: '',
     usd_payment_method: 'Bank'
   });
@@ -126,21 +130,37 @@ export default function App() {
     setFormData(prev => ({ ...prev, reg_no: '', txn_id: '' }));
   }, [formData.batch_name]);
 
-  // 3. Fetch Attendance & Calculate for Current Month
+  // 3. Smart Quarter-Based Attendance Fetching
   useEffect(() => {
     const fetchAttendance = async () => {
-      if (!formData.batch_name || !formData.reg_no) {
+      if (!formData.batch_name || !formData.reg_no || !formData.period) {
         setAttendanceCount(0);
         return;
       }
       
       setLoading(true);
       try {
-        // BULLETPROOF DATE: Gets local timezone year and month perfectly (YYYY-MM)
+        // SMART YEAR MAPPING LOGIC
         const now = new Date();
-        const year = now.getFullYear();
-        const month = String(now.getMonth() + 1).padStart(2, '0');
-        const currentMonthPrefix = `${year}-${month}`; 
+        const cy = now.getFullYear();
+        const cm = now.getMonth() + 1; // 1 to 12
+        let targetMonths: string[] = [];
+
+        if (formData.period === 'June/Jul/Aug') {
+          targetMonths = [`${cy}-06`, `${cy}-07`, `${cy}-08`];
+        } else if (formData.period === 'Sep/Oct/Nov') {
+          targetMonths = [`${cy}-09`, `${cy}-10`, `${cy}-11`];
+        } else if (formData.period === 'March') {
+          targetMonths = [`${cy}-03`];
+        } else if (formData.period === 'Dec/Jan/Feb') {
+          // If we are early in the year (Jan/Feb/Mar), December was last year
+          if (cm <= 3) {
+            targetMonths = [`${cy-1}-12`, `${cy}-01`, `${cy}-02`];
+          } else {
+            // If we are late in the year, Jan/Feb are next year
+            targetMonths = [`${cy}-12`, `${cy+1}-01`, `${cy+1}-02`];
+          }
+        }
         
         const q = query(collection(db, 'attendance'), where('batch_name', '==', formData.batch_name));
         const querySnapshot = await getDocs(q);
@@ -149,18 +169,18 @@ export default function App() {
         
         querySnapshot.forEach((doc) => {
           const data = doc.data();
-          // Filter strictly for the current month and valid session types
-          if (data.date && data.date.startsWith(currentMonthPrefix)) {
-            const type = (data.sessionType || "Regular").trim();
-            if (type === "Regular" || type === "Re-Scheduled") {
-              
-              // BULLETPROOF ID CHECK: Handles numbers, strings, and accidental spaces
-              const isPresent = data.presentStudents && data.presentStudents.some((id: any) => 
-                String(id).trim() === String(formData.reg_no).trim()
-              );
-              
-              if (isPresent) {
-                presentCount++;
+          if (data.date) {
+            const docMonthPrefix = data.date.substring(0, 7); // Gets "YYYY-MM"
+            if (targetMonths.includes(docMonthPrefix)) {
+              const type = (data.sessionType || "Regular").trim();
+              if (type === "Regular" || type === "Re-Scheduled") {
+                // BULLETPROOF ID CHECK
+                const isPresent = data.presentStudents && data.presentStudents.some((id: any) => 
+                  String(id).trim() === String(formData.reg_no).trim()
+                );
+                if (isPresent) {
+                  presentCount++;
+                }
               }
             }
           }
@@ -176,7 +196,8 @@ export default function App() {
     };
 
     fetchAttendance();
-  }, [formData.batch_name, formData.reg_no]);
+  }, [formData.batch_name, formData.reg_no, formData.period]);
+
   // 4. Clean Fee Calculation
   const calculation = useMemo(() => {
     if (!selectedBatchObj || !selectedStudent) return { base: 0, total: 0, currency: 'INR', symbol: '₹' };
@@ -184,7 +205,6 @@ export default function App() {
     const base = attendanceCount * selectedBatchObj.fee;
     let total = base;
     
-    // Add PayPal Handling Fee if selected
     if (selectedBatchObj.currency === 'USD' && formData.usd_payment_method === 'PayPal') {
       total += PAYPAL_DETAILS.handlingFee;
     }
@@ -197,10 +217,6 @@ export default function App() {
     };
   }, [selectedBatchObj, selectedStudent, attendanceCount, formData.usd_payment_method]);
 
-  const currentMonthName = useMemo(() => {
-    return new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
-  }, []);
-
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -209,13 +225,13 @@ export default function App() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.batch_name || !formData.reg_no || !formData.txn_id) {
+    if (!formData.batch_name || !formData.reg_no || !formData.period || !formData.txn_id) {
       setError("Please fill in all required fields.");
       return;
     }
 
     if (attendanceCount === 0) {
-      setError("No attendance records found for this month. Payment is not required.");
+      setError("No attendance records found for this quarter. Payment is not required.");
       return;
     }
 
@@ -227,8 +243,8 @@ export default function App() {
         student_name: selectedStudent?.name,
         reg_no: formData.reg_no,
         batch_name: formData.batch_name,
-        payment_frequency: 'Per-Class (Online)',
-        period_paid: currentMonthName,
+        payment_frequency: 'Quarterly (Online)',
+        period_paid: formData.period,
         classes_attended: attendanceCount,
         amount_paid: calculation.total,
         currency: calculation.currency,
@@ -247,6 +263,7 @@ export default function App() {
       setFormData({
         batch_name: '',
         reg_no: '',
+        period: '',
         txn_id: '',
         usd_payment_method: 'Bank'
       });
@@ -259,7 +276,6 @@ export default function App() {
       setSubmitting(false);
     }
   };
-
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col items-center py-12 px-4 sm:px-6 lg:px-8 font-sans print:py-0 print:bg-white">
       <div className="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden print:hidden">
@@ -318,12 +334,30 @@ export default function App() {
               </select>
             </div>
 
+            {/* NEW: Quarter Selection */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Select Quarter</label>
+              <select
+                name="period"
+                value={formData.period}
+                onChange={handleInputChange}
+                disabled={!formData.reg_no}
+                className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-gray-900 focus:border-[#673ab7] focus:ring-2 focus:ring-[#673ab7] focus:outline-none disabled:bg-gray-100"
+                required
+              >
+                <option value="">-- Select Quarter --</option>
+                {QUARTERS.map(q => (
+                  <option key={q} value={q}>{q}</option>
+                ))}
+              </select>
+            </div>
+
             {/* Attendance & Amount Display */}
-            {selectedStudent && (
+            {selectedStudent && formData.period && (
               <div className="bg-purple-50 rounded-xl p-5 border border-purple-100 my-6 animate-in fade-in slide-in-from-bottom-2">
                 <div className="flex justify-between items-center mb-4 pb-4 border-b border-purple-200">
-                  <span className="text-sm text-purple-800 font-medium">Month</span>
-                  <span className="text-sm font-bold text-purple-900 bg-purple-200 px-3 py-1 rounded-full">{currentMonthName}</span>
+                  <span className="text-sm text-purple-800 font-medium">Quarter</span>
+                  <span className="text-sm font-bold text-purple-900 bg-purple-200 px-3 py-1 rounded-full">{formData.period}</span>
                 </div>
                 
                 <div className="flex justify-between items-center mb-2">
@@ -362,7 +396,7 @@ export default function App() {
             )}
 
             {/* ROUTING LOGIC: PAYMENT DETAILS */}
-            {selectedStudent && attendanceCount > 0 && selectedBatchObj && (
+            {selectedStudent && formData.period && attendanceCount > 0 && selectedBatchObj && (
               <div className="border border-gray-200 rounded-xl p-5 bg-white shadow-sm my-6">
                 
                 {/* --- USD ROUTING --- */}
