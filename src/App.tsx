@@ -333,12 +333,30 @@ export default function App() {
               </select>
             </div>
 
+            {/* NEW: Quarter Selection */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Select Quarter</label>
+              <select
+                name="period"
+                value={formData.period}
+                onChange={handleInputChange}
+                disabled={!formData.reg_no}
+                className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-gray-900 focus:border-[#673ab7] focus:ring-2 focus:ring-[#673ab7] focus:outline-none disabled:bg-gray-100"
+                required
+              >
+                <option value="">-- Select Quarter --</option>
+                {QUARTERS.map(q => (
+                  <option key={q} value={q}>{q}</option>
+                ))}
+              </select>
+            </div>
+
             {/* Attendance & Amount Display */}
-            {selectedStudent && (
+            {selectedStudent && formData.period && (
               <div className="bg-purple-50 rounded-xl p-5 border border-purple-100 my-6 animate-in fade-in slide-in-from-bottom-2">
                 <div className="flex justify-between items-center mb-4 pb-4 border-b border-purple-200">
-                  <span className="text-sm text-purple-800 font-medium">Month</span>
-                  <span className="text-sm font-bold text-purple-900 bg-purple-200 px-3 py-1 rounded-full">{currentMonthName}</span>
+                  <span className="text-sm text-purple-800 font-medium">Quarter</span>
+                  <span className="text-sm font-bold text-purple-900 bg-purple-200 px-3 py-1 rounded-full">{formData.period}</span>
                 </div>
                 
                 <div className="flex justify-between items-center mb-2">
@@ -377,7 +395,7 @@ export default function App() {
             )}
 
             {/* ROUTING LOGIC: PAYMENT DETAILS */}
-            {selectedStudent && attendanceCount > 0 && selectedBatchObj && (
+            {selectedStudent && formData.period && attendanceCount > 0 && selectedBatchObj && (
               <div className="border border-gray-200 rounded-xl p-5 bg-white shadow-sm my-6">
                 
                 {/* --- USD ROUTING --- */}
