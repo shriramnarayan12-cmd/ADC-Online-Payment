@@ -130,7 +130,7 @@ export default function App() {
     setFormData(prev => ({ ...prev, reg_no: '', txn_id: '' }));
   }, [formData.batch_name]);
 
-  // 3. Smart Quarter-Based Attendance Fetching
+// 3. Smart Quarter-Based Attendance Fetching
   useEffect(() => {
     const fetchAttendance = async () => {
       if (!formData.batch_name || !formData.reg_no || !formData.period) {
@@ -276,6 +276,7 @@ export default function App() {
       setSubmitting(false);
     }
   };
+  
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col items-center py-12 px-4 sm:px-6 lg:px-8 font-sans print:py-0 print:bg-white">
       <div className="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden print:hidden">
@@ -331,9 +332,7 @@ export default function App() {
                 {students.map(s => (
                   <option key={s.reg_no} value={s.reg_no}>{s.name} ({s.reg_no})</option>
                 ))}
-              </select>
-            </div>
-
+              
             {/* NEW: Quarter Selection */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Select Quarter</label>
@@ -361,6 +360,8 @@ export default function App() {
                 </div>
                 
                 <div className="flex justify-between items-center mb-2">
+
+            
                   <span className="text-sm text-gray-600">Classes Attended:</span>
                   <span className="text-lg font-bold text-gray-900">{attendanceCount}</span>
                 </div>
